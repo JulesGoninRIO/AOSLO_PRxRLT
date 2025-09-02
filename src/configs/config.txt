@@ -1,0 +1,80 @@
+[os]
+__base_dir = P:\AOSLO\_automation\_PROCESSED\Photoreceptors\Healthy\_Results
+__powershell = C:\WINDOWS\system32\WindowsPowerShell\v1.0\powershell.exe
+
+[Montaging]
+__do_montaging=False
+__gui_done = False
+__gui_location_file = locations.csv
+__do_ssim = True
+__ssim_n = 36
+__parallel = True
+__montaged_dir = montaged
+__corrected_dir = montaged_corrected
+__ssim_dir = ssim
+__corrected_montage_filename=locations.csv
+
+[Registring]
+__do_registring=False
+__do_analysis = False
+__register_dir = registered
+__csv_name = warps.csv
+
+[CellDetection]
+__do_mdrnn=True
+__do_analysis = False
+__do_nst = True
+__methods = ['zero', 'std', 'var']
+__replaces = ['border', 'median']
+__range_methods = ['lower', 'both']
+__specials = ['nst', 'match']
+__corrects = ['local', 'global']
+__treats = "both"
+__visualize_patches = False
+__mdrnn_overlap_distance_same_image = 5
+__mdrnn_overlap_distance = 5
+__do_atms=True
+__atms_overlap_distance = 3
+__output_dir_atms = postprocessed_atms_single
+__axial_length_file = V:\Studies\AOSLO\data\cohorts\AOSLO healthy\DATA_HC+DM.xlsx
+
+[Diabete]
+__do_diabetic_analysis=False
+__diabetic_analysis_dir=diabetic_analysis
+__do_global_analysis=True
+__global_diabetic_dir=biomarker_analysis
+
+[Density]
+__do_density_analysis=False
+__growing_factor = [0.2, 200.0]
+__center_limit = 0.5
+__curve_fit_limit = 4
+__atms_limit = 4
+__mdrnn_limit = 2
+__analysis_dir = density_analysis_new
+__do_global_analysis=False
+__global_density_dir=all_stats
+__density_analysis_dir=density_analysis_new
+
+[LayerThickness]
+__do_compare_to_layer_thickness=False
+__layer_thickness_dir = layer_new
+
+[BloodFlow]
+__do_blood_flow=False
+__blood_speed_estimation=False
+__blood_model=False
+__vessel_size = ['small', 'medium', 'large']
+__model_output_dir = model_grid_searcher
+__speed_output_dir = speed_estimation
+
+[Analysis]
+__do_density = True
+__do_layer = False
+__do_global_density=False
+
+[AdvancedAnalysis]
+__do_registring=False
+__do_diabetic = False
+__do_global_diabetic=False
+

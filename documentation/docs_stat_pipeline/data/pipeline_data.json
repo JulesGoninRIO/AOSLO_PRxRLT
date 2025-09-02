@@ -1,0 +1,277 @@
+{
+  "nodes": [
+    {
+      "id": "density_pipeline_manager",
+      "label": "DensityAnalysisPipelineManager",
+      "category": "entry_point",
+      "description": "Main pipeline orchestrator. Coordinates montage loading, density extraction, and layer analysis.",
+      "details": "Entry point for the density analysis pipeline. Handles different execution modes (from_csv, do_layer, etc.) and coordinates all major processing steps.",
+      "doc_link": "docs/density_pipeline.md",
+      "critical": true
+    },
+    {
+      "id": "path_manager",
+      "label": "ProcessingPathManager",
+      "category": "utility",
+      "description": "Manages file paths and directory structure for the pipeline.",
+      "details": "Handles complex directory structure and file organization. Critical for maintaining consistent file access across pipeline components.",
+      "doc_link": "docs/processing_path_manager.md",
+      "critical": true
+    },
+    {
+      "id": "montage_mosaic_builder",
+      "label": "MontageMosaicBuilder",
+      "category": "processor",
+      "description": "Abstract base class for building retinal mosaics from AOSLO images.",
+      "details": "Implements Builder pattern with multiple concrete implementations for different data sources and correction states.",
+      "doc_link": "docs/montage_builder.md#montagemosaicbuilder-abstract-base",
+      "critical": true
+    },
+    {
+      "id": "corrected_montage_builder",
+      "label": "CorrectedMontageMosaicBuilder",
+      "category": "processor",
+      "description": "Primary builder for production use. Processes manually corrected montage data.",
+      "details": "Handles complex transformation pipeline: scaling, rotation, translation, and perspective corrections from GUI-corrected positioning data.",
+      "doc_link": "docs/montage_builder.md#correctedmontagemosaicbuilder-primary",
+      "critical": true
+    },
+    {
+      "id": "matlab_montage_builder",
+      "label": "MatlabMontageMosaicBuilder",
+      "category": "processor",
+      "description": "Processes transformation data directly from MATLAB montaging outputs.",
+      "details": "Reads .mat files containing transformation matrices and applies inverse transformations to reconstruct montage coordinates.",
+      "doc_link": "docs/montage_builder.md#matlabmontagemosaicbuilder",
+      "critical": false
+    },
+    {
+      "id": "montage_mosaic",
+      "label": "MontageMosaic",
+      "category": "data_structure",
+      "description": "Data structure holding the reconstructed retinal mosaic.",
+      "details": "Contains montage elements, center point, and coordinate system information. Provides fovea-centered coordinate system for analysis.",
+      "doc_link": "docs/montage_mosaic.md",
+      "critical": true
+    },
+    {
+      "id": "cone_density_calculator",
+      "label": "ConeDensityCalculator",
+      "category": "processor",
+      "description": "Main density calculation coordinator.",
+      "details": "Orchestrates density calculation pipeline and manages data flow between Yellott calculator and density fitting.",
+      "doc_link": "docs/cone_density_calculator.md#conedensitycalculator",
+      "critical": true
+    },
+    {
+      "id": "yellott_calculator",
+      "label": "YellottConeDensityCalculator",
+      "category": "processor",
+      "description": "Implements Yellott's ring method for cone density extraction.",
+      "details": "Core mathematical implementation using Fourier-domain analysis. Handles bilateral model fitting with physiological constraints.",
+      "doc_link": "docs/cone_density_calculator.md#yellotts-ring-method-implementation",
+      "critical": true
+    },
+    {
+      "id": "density",
+      "label": "Density",
+      "category": "data_structure",
+      "description": "Data structure containing cone density measurements.",
+      "details": "Holds raw, smoothed, and fitted density data for X and Y directions. Output of density extraction pipeline.",
+      "doc_link": "docs/density.md",
+      "critical": true
+    },
+    {
+      "id": "layer_collection",
+      "label": "LayerCollection",
+      "category": "processor",
+      "description": "Loads and preprocesses OCT layer thickness data.",
+      "details": "Handles coordinate system alignment, data length harmonization, and preprocessing of thickness, CVI, and OS data.",
+      "doc_link": "docs/layer_processing.md#layercollection-data-loading-and-preprocessing",
+      "critical": true
+    },
+    {
+      "id": "layer_thickness_calculator",
+      "label": "LayerThicknessCalculator",
+      "category": "processor",
+      "description": "Extracts thickness measurements at specific eccentricities.",
+      "details": "Implements triangle region extraction and spatial sampling to match cone density analysis regions.",
+      "doc_link": "docs/layer_processing.md#layerthicknesscalculator-spatial-sampling-and-triangle-extraction",
+      "critical": true
+    },
+    {
+      "id": "density_layer_analysis",
+      "label": "DensityLayerAnalysis",
+      "category": "analysis",
+      "description": "Correlates cone densities with layer thicknesses.",
+      "details": "Performs statistical correlation analysis using Spearman coefficients. Handles complex layer profiles with peak detection.",
+      "doc_link": "docs/layer_processing.md#densitylayeranalysis-correlation-analysis-and-statistical-processing",
+      "critical": true
+    },
+    {
+      "id": "layer",
+      "label": "Layer",
+      "category": "data_structure",
+      "description": "Data structure for retinal layer thickness measurements.",
+      "details": "Holds thickness data organized by eccentricity bins. Supports padding, smoothing, and gap filling operations.",
+      "doc_link": "docs/layer.md",
+      "critical": true
+    }
+  ],
+  "edges": [
+    {
+      "source": "density_pipeline_manager",
+      "target": "path_manager",
+      "label": "initializes",
+      "type": "creates"
+    },
+    {
+      "source": "density_pipeline_manager",
+      "target": "corrected_montage_builder",
+      "label": "builds_montage",
+      "type": "calls"
+    },
+    {
+      "source": "density_pipeline_manager",
+      "target": "cone_density_calculator",
+      "label": "extracts_densities",
+      "type": "calls"
+    },
+    {
+      "source": "density_pipeline_manager",
+      "target": "layer_collection",
+      "label": "processes_layers",
+      "type": "calls",
+      "conditional": true
+    },
+    {
+      "source": "montage_mosaic_builder",
+      "target": "corrected_montage_builder",
+      "label": "implements",
+      "type": "inheritance"
+    },
+    {
+      "source": "montage_mosaic_builder",
+      "target": "matlab_montage_builder",
+      "label": "implements",
+      "type": "inheritance"
+    },
+    {
+      "source": "corrected_montage_builder",
+      "target": "montage_mosaic",
+      "label": "creates",
+      "type": "produces"
+    },
+    {
+      "source": "matlab_montage_builder",
+      "target": "montage_mosaic",
+      "label": "creates",
+      "type": "produces"
+    },
+    {
+      "source": "cone_density_calculator",
+      "target": "yellott_calculator",
+      "label": "uses",
+      "type": "delegates"
+    },
+    {
+      "source": "cone_density_calculator",
+      "target": "montage_mosaic",
+      "label": "reads_from",
+      "type": "data_flow"
+    },
+    {
+      "source": "yellott_calculator",
+      "target": "montage_mosaic",
+      "label": "analyzes",
+      "type": "data_flow"
+    },
+    {
+      "source": "yellott_calculator",
+      "target": "density",
+      "label": "produces",
+      "type": "produces"
+    },
+    {
+      "source": "layer_collection",
+      "target": "layer_thickness_calculator",
+      "label": "feeds_to",
+      "type": "data_flow"
+    },
+    {
+      "source": "layer_collection",
+      "target": "layer",
+      "label": "creates",
+      "type": "produces"
+    },
+    {
+      "source": "layer_thickness_calculator",
+      "target": "layer",
+      "label": "processes",
+      "type": "modifies"
+    },
+    {
+      "source": "layer_thickness_calculator",
+      "target": "density_layer_analysis",
+      "label": "feeds_to",
+      "type": "data_flow"
+    },
+    {
+      "source": "density_layer_analysis",
+      "target": "density",
+      "label": "correlates_with",
+      "type": "data_flow"
+    },
+    {
+      "source": "density_layer_analysis",
+      "target": "layer",
+      "label": "analyzes",
+      "type": "data_flow"
+    },
+    {
+      "source": "path_manager",
+      "target": "corrected_montage_builder",
+      "label": "provides_paths",
+      "type": "dependency"
+    },
+    {
+      "source": "path_manager",
+      "target": "cone_density_calculator",
+      "label": "provides_paths",
+      "type": "dependency"
+    },
+    {
+      "source": "path_manager",
+      "target": "layer_collection",
+      "label": "provides_paths",
+      "type": "dependency"
+    }
+  ],
+  "categories": {
+    "entry_point": {
+      "color": "#e74c3c",
+      "label": "Entry Points",
+      "description": "Main pipeline entry points and orchestrators"
+    },
+    "processor": {
+      "color": "#3498db", 
+      "label": "Core Processors",
+      "description": "Main processing components that transform data"
+    },
+    "data_structure": {
+      "color": "#f39c12",
+      "label": "Data Structures", 
+      "description": "Classes that hold and organize pipeline data"
+    },
+    "utility": {
+      "color": "#27ae60",
+      "label": "Utilities",
+      "description": "Support classes for path management, configuration, etc."
+    },
+    "analysis": {
+      "color": "#9b59b6",
+      "label": "Analysis Tools",
+      "description": "Components that perform statistical analysis and correlation"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+[os]
+__powerShell = C:\WINDOWS\system32\WindowsPowerShell\v1.0\powershell.exe
+[Pipeline]
+__ActivationTimeInterval_seconds = 5
+__RestAfterRun_seconds = 3
+[AOImgProc]
+__WaitingRoom_AOImageProc = P:\AOSLO\_automation\__WaitingRoom_AOImageProc
+__AOImageProc_Home = P:\AOSLO\_automation\
+__AOImageProc_InFolder = P:\AOSLO\_automation\__AOImageProc_InFolder
+__AOImageProc_OutFolder = P:\AOSLO\_automation\__AOImageProc_OutFolder
+__UI_automationTool = C:\ProgramData\Microsoft\Windows\Start Menu\Programs\AutoIt v3\Run Script (x64).lnk
+__UI_automationScript = P:\AOSLO\_automation\autoIT_invoke_PowerAutomate.au3
+__AOImgProc_retriesOnFailure = 5
+__modalities = ["CalculatedSplit", "Confocal", "OA850nm", "DarkField", "Reflected", "OA790nm", "Direct"]
+[Montaging]
+__Montaging_InFolder = P:\AOSLO\_automation\__Montaging_InFolder

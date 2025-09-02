@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cone Density Analysis Pipeline</title>
+    <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 1.8rem;
+        }
+        
+        .header p {
+            margin: 0.5rem 0 0 0;
+            opacity: 0.8;
+            font-size: 0.9rem;
+        }
+        
+        .container {
+            display: flex;
+            height: calc(100vh - 120px);
+        }
+        
+        .sidebar {
+            width: 300px;
+            background-color: white;
+            border-right: 1px solid #ddd;
+            padding: 1rem;
+            overflow-y: auto;
+            box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+        }
+        
+        .main-content {
+            flex: 1;
+            position: relative;
+        }
+        
+        #cy {
+            width: 100%;
+            height: 100%;
+            background-color: white;
+        }
+        
+        .legend {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        
+        .legend h3 {
+            margin: 0 0 0.5rem 0;
+            color: #2c3e50;
+            font-size: 1rem;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+        }
+        
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+        
+        .info-panel {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .info-panel h4 {
+            margin: 0 0 0.5rem 0;
+            color: #2c3e50;
+        }
+        
+        .info-panel p {
+            margin: 0;
+            font-size: 0.85rem;
+            color: #555;
+            line-height: 1.4;
+        }
+        
+        .controls {
+            padding: 1rem;
+            background-color: white;
+            border-bottom: 1px solid #ddd;
+            text-align: center;
+        }
+        
+        .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 0.25rem;
+            font-size: 0.85rem;
+        }
+        
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        
+        .tooltip {
+            position: absolute;
+            background-color: #2c3e50;
+            color: white;
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            pointer-events: none;
+            z-index: 1000;
+            max-width: 200px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        
+        .doc-link {
+            color: #3498db;
+            text-decoration: none;
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+            display: inline-block;
+        }
+        
+        .doc-link:hover {
+            text-decoration: underline;
+        }
+        
+        .critical-badge {
+            background-color: #e74c3c;
+            color: white;
+            font-size: 0.7rem;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            margin-left: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Cone Density Analysis Pipeline</h1>
+        <p>Interactive visualization of the AOSLO processing pipeline</p>
+    </div>
+    
+    <div class="controls">
+        <button class="btn" onclick="resetView()">Reset View</button>
+        <button class="btn" onclick="fitToScreen()">Fit to Screen</button>
+        <button class="btn" onclick="toggleLayout()">Toggle Layout</button>
+    </div>
+    
+    <div class="container">
+        <div class="sidebar">
+            <div class="legend" id="legend">
+                <h3>Component Types</h3>
+                <!-- Legend items will be populated from JSON -->
+            </div>
+            
+            <div class="info-panel" id="info-panel">
+                <h4>Pipeline Overview</h4>
+                <p>Click on any component to see detailed information. Hover over nodes and edges to see relationships and descriptions.</p>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div id="cy"></div>
+        </div>
+    </div>
+    
+    <div id="tooltip" class="tooltip" style="display: none;"></div>
+
+    <script src="data/pipeline_data.js"></script>
+    <script>
+        let cy;
+        let currentLayout = 'breadthfirst';
+        let showEdgeLabels = false;
+        let showOnlyCriticalNodes = false;
+
+        // Initialize visualization when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded');
+            console.log('Pipeline data available:', !!window.pipelineData);
+            if (window.pipelineData) {
+                console.log('Pipeline data nodes:', window.pipelineData.nodes.length);
+                console.log('Pipeline data edges:', window.pipelineData.edges.length);
+                initializeVisualization();
+                populateLegend();
+            } else {
+                console.error('Pipeline data not found');
+                document.getElementById('info-panel').innerHTML = 
+                    '<h4>Error</h4><p>Could not load pipeline data. Make sure pipeline_data.js is in the data/ folder.</p>';
+            }
+        });
+
+        function initializeVisualization() {
+            console.log('Initializing visualization...');
+            const elements = [];
+            
+            // Add nodes
+            window.pipelineData.nodes.forEach(node => {
+                console.log('Adding node:', node.label);
+                elements.push({
+                    data: {
+                        id: node.id,
+                        label: node.label,
+                        category: node.category,
+                        description: node.description,
+                        details: node.details,
+                        doc_link: node.doc_link,
+                        critical: node.critical
+                    }
+                });
+            });
+            
+            // Add edges
+            window.pipelineData.edges.forEach(edge => {
+                console.log('Adding edge:', edge.source, '->', edge.target);
+                elements.push({
+                    data: {
+                        id: `${edge.source}-${edge.target}`,
+                        source: edge.source,
+                        target: edge.target,
+                        label: edge.label,
+                        type: edge.type,
+                        conditional: edge.conditional
+                    }
+                });
+            });
+
+            console.log('Total elements:', elements.length);
+
+            cy = cytoscape({
+                container: document.getElementById('cy'),
+                elements: elements,
+                style: [
+                    {
+                        selector: 'node',
+                        style: {
+                            'background-color': 'data(category)',
+                            'label': 'data(label)',
+                            'width': 100,
+                            'height': 100,
+                            'text-valign': 'center',
+                            'text-halign': 'center',
+                            'font-size': '11px',
+                            'text-wrap': 'wrap',
+                            'text-max-width': '85px',
+                            'border-width': 3,
+                            'border-color': '#34495e',
+                            'color': 'white',
+                            'text-outline-width': 2,
+                            'text-outline-color': '#2c3e50',
+                            'transition-property': 'width, height, border-width, font-size',
+                            'transition-duration': '0.3s',
+                            'transition-timing-function': 'ease-out'
+                        }
+                    },
+                    {
+                        selector: 'node:active',
+                        style: {
+                            'overlay-opacity': 0.2,
+                            'overlay-color': '#f39c12'
+                        }
+                    },
+                    {
+                        selector: 'node[critical = "true"]',
+                        style: {
+                            'border-width': 5,
+                            'border-color': '#e74c3c',
+                            'border-style': 'solid'
+                        }
+                    },
+                    // Category-specific colors and shapes - more rounded
+                    {
+                        selector: 'node[category = "entry_point"]',
+                        style: {
+                            'background-color': '#e74c3c',
+                            'shape': 'round-rectangle'
+                        }
+                    },
+                    {
+                        selector: 'node[category = "processor"]',
+                        style: {
+                            'background-color': '#3498db',
+                            'shape': 'ellipse'
+                        }
+                    },
+                    {
+                        selector: 'node[category = "data_structure"]',
+                        style: {
+                            'background-color': '#f39c12',
+                            'shape': 'round-octagon'
+                        }
+                    },
+                    {
+                        selector: 'node[category = "utility"]',
+                        style: {
+                            'background-color': '#27ae60',
+                            'shape': 'ellipse'
+                        }
+                    },
+                    {
+                        selector: 'node[category = "analysis"]',
+                        style: {
+                            'background-color': '#9b59b6',
+                            'shape': 'round-rectangle'
+                        }
+                    },
+                    {
+                        selector: 'node[category = "output"]',
+                        style: {
+                            'background-color': '#e67e22',
+                            'shape': 'round-diamond'
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 3,
+                            'line-color': '#7f8c8d',
+                            'target-arrow-color': '#7f8c8d',
+                            'target-arrow-shape': 'triangle',
+                            'target-arrow-size': 12,
+                            'curve-style': 'bezier',
+                            'control-point-step-size': 60,
+                            'label': '',
+                            'font-size': '9px',
+                            'text-rotation': 'autorotate',
+                            'text-margin-y': -12,
+                            'color': '#2c3e50',
+                            'text-background-color': 'white',
+                            'text-background-opacity': 0.9,
+                            'text-background-padding': '3px',
+                            'text-background-shape': 'round-rectangle',
+                            'transition-property': 'width, line-color, target-arrow-color',
+                            'transition-duration': '0.3s'
+                        }
+                    },
+                    {
+                        selector: 'edge[type = "inheritance"]',
+                        style: {
+                            'line-style': 'dashed',
+                            'line-color': '#95a5a6',
+                            'target-arrow-color': '#95a5a6'
+                        }
+                    },
+                    {
+                        selector: 'edge[conditional = "true"]',
+                        style: {
+                            'line-style': 'dotted',
+                            'line-color': '#bdc3c7',
+                            'target-arrow-color': '#bdc3c7'
+                        }
+                    },
+                    {
+                        selector: 'node:selected',
+                        style: {
+                            'border-width': 8,
+                            'border-color': '#f39c12'
+                        }
+                    },
+                    {
+                        selector: 'edge:selected',
+                        style: {
+                            'width': 6,
+                            'line-color': '#f39c12',
+                            'target-arrow-color': '#f39c12'
+                        }
+                    },
+                    {
+                        selector: '.highlighted',
+                        style: {
+                            'background-color': '#f39c12',
+                            'line-color': '#f39c12',
+                            'target-arrow-color': '#f39c12',
+                            'transition-property': 'background-color, line-color, target-arrow-color',
+                            'transition-duration': '0.5s'
+                        }
+                    },
+                    {
+                        selector: '.faded',
+                        style: {
+                            'opacity': 0.2,
+                            'text-opacity': 0.2,
+                            'transition-property': 'opacity',
+                            'transition-duration': '0.5s'
+                        }
+                    },
+                    {
+                        selector: '.hovered',
+                        style: {
+                            'width': 130,
+                            'height': 130,
+                            'border-width': 6,
+                            'font-size': '13px',
+                            'z-index': 999
+                        }
+                    },
+                    {
+                        selector: 'edge.hovered',
+                        style: {
+                            'width': 5,
+                            'line-color': '#34495e',
+                            'target-arrow-color': '#34495e',
+                            'opacity': 0.8
+                        }
+                    },
+                    {
+                        selector: '.connected-hovered',
+                        style: {
+                            'width': 115,
+                            'height': 115,
+                            'border-width': 4,
+                            'font-size': '12px',
+                            'opacity': 1,
+                            'z-index': 888
+                        }
+                    },
+                    {
+                        selector: 'edge.connected-hovered',
+                        style: {
+                            'width': 6,
+                            'opacity': 1,
+                            'line-color': '#34495e',
+                            'target-arrow-color': '#34495e'
+                        }
+                    }
+                ],
+                layout: {
+                    name: currentLayout,
+                    directed: true,
+                    roots: ['density_pipeline_manager'],
+                    padding: 80,
+                    spacingFactor: 2.0,
+                    nodeDimensionsIncludeLabels: true
+                }
+            });
+
+            console.log('Cytoscape initialized:', cy);
+            console.log('Node count:', cy.nodes().length);
+            console.log('Edge count:', cy.edges().length);
+
+            // Set initial zoom and center on density_pipeline_manager
+            setTimeout(() => {
+                const entryNode = cy.getElementById('density_pipeline_manager');
+                if (entryNode.length > 0) {
+                    cy.fit();
+                    cy.center(entryNode);
+                    cy.zoom(0.8); // Zoom in a bit more
+                } else {
+                    cy.fit();
+                }
+            }, 100);
+
+            // Add event listeners
+            cy.on('tap', 'node', function(evt) {
+                const node = evt.target;
+                updateInfoPanel(node.data());
+                highlightConnected(node);
+            });
+
+            cy.on('tap', function(evt) {
+                if (evt.target === cy) {
+                    // Clicked on background - clear highlighting
+                    cy.elements().removeClass('highlighted faded');
+                }
+            });
+
+            cy.on('mouseover', 'node', function(evt) {
+                const node = evt.target;
+                node.addClass('hovered');
+                
+                // Highlight connected elements
+                const connectedNodes = node.neighborhood('node');
+                const connectedEdges = node.connectedEdges();
+                
+                connectedNodes.addClass('connected-hovered');
+                connectedEdges.addClass('connected-hovered');
+                
+                showTooltip(evt, node.data().description);
+            });
+
+            cy.on('mouseout', 'node', function(evt) {
+                const node = evt.target;
+                node.removeClass('hovered');
+                
+                // Remove highlighting from connected elements
+                const connectedNodes = node.neighborhood('node');
+                const connectedEdges = node.connectedEdges();
+                
+                connectedNodes.removeClass('connected-hovered');
+                connectedEdges.removeClass('connected-hovered');
+                
+                hideTooltip();
+            });
+
+            cy.on('mouseover', 'edge', function(evt) {
+                const edge = evt.target;
+                edge.addClass('hovered');
+                showTooltip(evt, `${edge.data().label} (${edge.data().type})`);
+            });
+
+            cy.on('mouseout', 'edge', function(evt) {
+                const edge = evt.target;
+                edge.removeClass('hovered');
+                hideTooltip();
+            });
+        }
+
+        function highlightConnected(node) {
+            // Clear previous highlighting
+            cy.elements().removeClass('highlighted faded');
+            
+            // Get connected elements
+            const connected = node.closedNeighborhood();
+            const notConnected = cy.elements().not(connected);
+            
+            // Highlight connected, fade others
+            connected.addClass('highlighted');
+            notConnected.addClass('faded');
+        }
+
+        function populateLegend() {
+            const legendElement = document.getElementById('legend');
+            let legendHTML = '<h3>Component Types</h3>';
+            
+            Object.entries(pipelineData.categories).forEach(([key, category]) => {
+                legendHTML += `
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: ${category.color};"></div>
+                        ${category.label}
+                    </div>
+                `;
+            });
+            
+            legendElement.innerHTML = legendHTML;
+        }
+
+        function updateInfoPanel(nodeData) {
+            const infoPanel = document.getElementById('info-panel');
+            const criticalBadge = nodeData.critical ? '<span class="critical-badge">CRITICAL</span>' : '';
+            
+            infoPanel.innerHTML = `
+                <h4>${nodeData.label} ${criticalBadge}</h4>
+                <p><strong>Type:</strong> ${pipelineData.categories[nodeData.category].label}</p>
+                <p><strong>Description:</strong> ${nodeData.description}</p>
+                <p><strong>Details:</strong> ${nodeData.details}</p>
+                ${nodeData.doc_link ? `<a href="${nodeData.doc_link}" class="doc-link">View Documentation →</a>` : ''}
+            `;
+        }
+
+        function showTooltip(evt, text) {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.innerHTML = text;
+            tooltip.style.display = 'block';
+            tooltip.style.left = evt.originalEvent.pageX + 10 + 'px';
+            tooltip.style.top = evt.originalEvent.pageY + 10 + 'px';
+        }
+
+        function hideTooltip() {
+            document.getElementById('tooltip').style.display = 'none';
+        }
+
+        function resetView() {
+            const entryNode = cy.getElementById('density_pipeline_manager');
+            if (entryNode.length > 0) {
+                cy.fit();
+                cy.center(entryNode);
+                cy.zoom(0.8);
+            } else {
+                cy.fit();
+                cy.center();
+            }
+        }
+
+        function fitToScreen() {
+            cy.fit();
+        }
+
+        function toggleLayout() {
+            const layouts = ['breadthfirst', 'circle', 'concentric', 'grid'];
+            const currentIndex = layouts.indexOf(currentLayout);
+            currentLayout = layouts[(currentIndex + 1) % layouts.length];
+            
+            const layoutOptions = {
+                name: currentLayout,
+                directed: true,
+                padding: 80,
+                spacingFactor: 2.0,
+                nodeDimensionsIncludeLabels: true
+            };
+            
+            // Add specific options for different layouts
+            if (currentLayout === 'breadthfirst') {
+                layoutOptions.roots = ['density_pipeline_manager'];
+            } else if (currentLayout === 'concentric') {
+                layoutOptions.concentric = function(node) {
+                    return node.data('critical') ? 10 : 1;
+                };
+                layoutOptions.levelWidth = function(nodes) {
+                    return 3;
+                };
+                layoutOptions.minNodeSpacing = 120;
+            } else if (currentLayout === 'circle') {
+                layoutOptions.radius = 300;
+            } else if (currentLayout === 'grid') {
+                layoutOptions.rows = 3;
+            }
+            
+            cy.layout(layoutOptions).run();
+        }
+
+        function toggleEdgeLabels() {
+            showEdgeLabels = !showEdgeLabels;
+            
+            // Update all edges
+            cy.edges().forEach(edge => {
+                if (showEdgeLabels) {
+                    edge.style('label', edge.data('label'));
+                } else {
+                    edge.style('label', '');
+                }
+            });
+        }
+
+        function showOnlyCritical() {
+            showOnlyCriticalNodes = true;
+            
+            // Hide non-critical nodes and their edges
+            cy.nodes().forEach(node => {
+                if (!node.data('critical')) {
+                    node.style('display', 'none');
+                    node.connectedEdges().style('display', 'none');
+                }
+            });
+        }
+
+        function showAll() {
+            showOnlyCriticalNodes = false;
+            
+            // Show all nodes and edges
+            cy.elements().style('display', 'element');
+        }
+    </script>
+</body>
+</html>
